@@ -3594,7 +3594,7 @@ const preguntas = [
       c: "Sirve para ejecutar programas que no están cargados totalmente en memoria.",
       d: "Protege la zona de memoria asignada a cada proceso."
     },
-    header: "a"
+    respuesta_correcta: "a"
   },
   {
     id: 328,
