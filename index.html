@@ -4,25 +4,89 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Test Osakidetza - Informática</title>
-    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <div class="contenedor">
-        <div class="cabecera">
-            <h2>Test Osakidetza</h2>
-            <span id="contador">Pregunta 1 de 700</span>
-        </div>
-        
-        <div id="pregunta-container">
-            <h3 id="enunciado">Cargando pregunta...</h3>
-            <div id="opciones-container">
-                </div>
+<body class="bg-gray-900 text-gray-100 font-sans p-4 sm:p-8 transition-colors duration-300">
+
+    <div class="max-w-4xl mx-auto bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 mt-6">
+
+        <!-- Pantalla de Selección -->
+        <div id="pantalla-seleccion" class="flex flex-col sm:flex-row items-center gap-4 bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+            <h2 class="text-lg font-semibold text-blue-400 whitespace-nowrap">Usuario:</h2>
+            <div id="formulario-ingreso" class="flex w-full gap-3">
+                <input type="text" id="input-usuario" list="lista-usuarios" placeholder="Elige tu nombre..."
+                       class="flex-1 px-4 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm placeholder-gray-400">
+                <datalist id="lista-usuarios"></datalist>
+                <button id="btn-empezar" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-md cursor-pointer">
+                    Empezar
+                </button>
+            </div>
         </div>
 
-        <button id="btn-siguiente" class="oculto">Siguiente Pregunta</button>
+        <!-- Pantalla de Test -->
+        <div id="test-container" class="hidden mt-6">
+            <div class="cabecera flex justify-between items-center border-b border-gray-700 pb-4 mb-6">
+                <h2 class="text-2xl font-bold text-gray-200">Test Osakidetza</h2>
+                <span id="contador" class="bg-blue-900/80 text-blue-300 px-3 py-1 rounded-full text-sm font-bold border border-blue-700">Cargando...</span>
+            </div>
+
+            <div id="pregunta-container">
+                <h3 id="enunciado" class="text-xl font-medium text-gray-100 mb-6 leading-relaxed">Cargando pregunta...</h3>
+                <div id="opciones-container" class="grid grid-cols-1 gap-3"></div>
+            </div>
+
+            <!-- Botonera inferior modificada -->
+            <div class="mt-8 flex justify-between items-center">
+                <button id="btn-finalizar" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white font-medium rounded-lg transition-colors shadow-md cursor-pointer">
+                    Finalizar Test
+                </button>
+                <button id="btn-siguiente" class="hidden px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors shadow-md cursor-pointer">
+                    Siguiente Pregunta
+                </button>
+            </div>
+        </div>
+
+        <!-- NUEVA PANTALLA: Estadísticas -->
+        <div id="estadisticas-container" class="hidden mt-6">
+            <div class="border-b border-gray-700 pb-4 mb-6">
+                <h2 class="text-3xl font-bold text-blue-400">Tus Estadísticas Históricas</h2>
+                <p class="text-gray-400 mt-1">Progreso acumulado desde tu primer test</p>
+            </div>
+
+            <!-- Tarjetas de Aciertos/Fallos -->
+            <div class="grid grid-cols-2 gap-4 mb-8 text-center">
+                <div class="bg-gray-700 p-6 rounded-lg border border-gray-600 shadow-inner">
+                    <h4 class="text-gray-400 text-sm uppercase tracking-wider font-bold mb-2">Aciertos Totales</h4>
+                    <p id="stat-aciertos" class="text-4xl font-bold text-green-400">0</p>
+                </div>
+                <div class="bg-gray-700 p-6 rounded-lg border border-gray-600 shadow-inner">
+                    <h4 class="text-gray-400 text-sm uppercase tracking-wider font-bold mb-2">Fallos Totales</h4>
+                    <p id="stat-fallos" class="text-4xl font-bold text-red-400">0</p>
+                </div>
+            </div>
+
+            <!-- Puntos débiles -->
+            <div class="bg-slate-800 p-6 rounded-lg border border-slate-700 shadow-inner">
+                <h3 class="text-xl font-semibold text-gray-200 mb-4 flex items-center gap-2">
+                    🎯 Tus Puntos Débiles (Top Fallos)
+                </h3>
+                <ul id="lista-puntos-debiles" class="space-y-3 text-gray-300">
+                    <!-- Las preguntas se inyectarán aquí con JS -->
+                </ul>
+            </div>
+
+            <div class="mt-8 flex justify-center">
+                <button id="btn-volver-inicio" class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-md cursor-pointer">
+                    Volver al Inicio
+                </button>
+            </div>
+        </div>
+
     </div>
 
     <script src="preguntas.js"></script>
+    <script src="db.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

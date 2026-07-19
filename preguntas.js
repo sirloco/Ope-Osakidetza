@@ -3608,7 +3608,7 @@ const preguntas = [
     respuesta_correcta: "c"
   },
   {
-    id: 229,
+    id: 329,
     enunciado: "¿Cuál es la diferencia fundamental entre el modelo OSI y TCP/IP?",
     opciones: {
       a: "OSI tiene 4 capas prácticas; TCP/IP tiene 7 teóricas.",
