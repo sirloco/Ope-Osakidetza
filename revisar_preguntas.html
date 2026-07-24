@@ -1,0 +1,171 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Revisión OPE - Formato Tabla</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- AQUÍ ESTÁ LA MAGIA: Importamos tu archivo directamente -->
+  <script src="preguntas.js"></script>
+  <style>
+    /* Cabecera fija para no perderte al hacer scroll abajo */
+    th { position: sticky; top: 0; z-index: 10; }
+  </style>
+</head>
+<body class="bg-gray-100 p-4 font-sans text-sm">
+
+  <div class="bg-white rounded-lg shadow-lg p-4 mb-4 flex justify-between items-center">
+    <div>
+      <h1 class="text-xl font-bold text-gray-800">Revisión de las últimas 200 preguntas (Específico)</h1>
+      <p class="text-gray-500">Leyendo directamente de <code class="bg-gray-200 px-1 rounded text-gray-700">preguntas.js</code></p>
+    </div>
+    <div class="flex gap-4 items-center">
+      <div class="text-sm">
+        <span class="font-bold text-green-600" id="revisadas-count">0</span> revisadas | 
+        <span class="font-bold text-yellow-600" id="dudosas-count">0</span> dudosas
+      </div>
+      <button onclick="exportarJSON()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold shadow">
+        📥 Descargar Estado de Revisión
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTENEDOR DE LA TABLA -->
+  <div class="bg-white shadow-lg rounded-lg overflow-x-auto max-h-[80vh] border border-gray-200">
+    <table class="min-w-full border-collapse table-fixed w-full">
+      <thead class="bg-gray-200 text-gray-700">
+        <tr>
+          <th class="border p-2 w-12 text-center shadow-sm">ID</th>
+          <th class="border p-2 w-1/4 text-left shadow-sm">Pregunta (Enunciado)</th>
+          <th class="border p-2 w-1/3 text-left shadow-sm">Opciones (Correcta en verde)</th>
+          <th class="border p-2 w-20 text-center shadow-sm">Revisada<br>(Sí/No)</th>
+          <th class="border p-2 w-20 text-center shadow-sm">Dudosa<br>(Sí/No)</th>
+          <th class="border p-2 w-48 text-left shadow-sm">Libro / Referencia</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpo-tabla" class="text-gray-700">
+        <!-- Las filas se inyectan con JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    // 1. COGEMOS LAS ÚLTIMAS 200 PREGUNTAS
+    // 'preguntas' ya existe porque lo hemos importado arriba con <script src="preguntas.js">
+    const preguntas200 = preguntas.slice(-200);
+
+    // 2. SISTEMA DE GUARDADO MEJORADO
+    // Guardamos SOLO el estado de la revisión vinculado al ID
+    let estadoRevision = JSON.parse(localStorage.getItem('ope_estado_revision')) || {};
+
+    function guardarLocal() {
+      localStorage.setItem('ope_estado_revision', JSON.stringify(estadoRevision));
+      actualizarContadores();
+    }
+
+    function getEstado(id) {
+      if (!estadoRevision[id]) {
+        estadoRevision[id] = { revisada: false, dudosa: false, libro_referencia: "" };
+      }
+      return estadoRevision[id];
+    }
+
+    function actualizarCampo(id, campo, valor) {
+      getEstado(id)[campo] = valor;
+      guardarLocal();
+      // Si marcamos como revisada, repintamos para que se ponga verde la fila
+      if (campo === 'revisada') {
+        renderizarTabla();
+      }
+    }
+
+    function actualizarContadores() {
+      let revisadas = 0;
+      let dudosas = 0;
+      
+      preguntas200.forEach(p => {
+        const est = estadoRevision[p.id] || {};
+        if (est.revisada) revisadas++;
+        if (est.dudosa) dudosas++;
+      });
+
+      document.getElementById('revisadas-count').innerText = revisadas;
+      document.getElementById('dudosas-count').innerText = dudosas;
+    }
+
+    // Pinta las opciones y resalta la correcta en color verde
+    function renderizarOpciones(opciones, correcta) {
+      let html = '<ul class="space-y-1 text-xs">';
+      for (const [letra, texto] of Object.entries(opciones)) {
+        const esCorrecta = letra === correcta;
+        const claseCss = esCorrecta 
+          ? 'bg-green-100 border border-green-400 text-green-900 font-bold p-1 rounded' 
+          : 'p-1';
+        
+        html += `<li class="${claseCss}"><span class="uppercase font-bold">${letra})</span> ${texto}</li>`;
+      }
+      html += '</ul>';
+      return html;
+    }
+
+    // Pinta la tabla completa
+    function renderizarTabla() {
+      const tbody = document.getElementById('cuerpo-tabla');
+      tbody.innerHTML = '';
+
+      preguntas200.forEach((p, index) => {
+        const estado = getEstado(p.id);
+        const tr = document.createElement('tr');
+        
+        // Colores alternos y fondo verde claro en toda la fila si está revisada
+        tr.className = `border-b hover:bg-blue-50 transition-colors ${estado.revisada ? 'bg-green-50/50' : (index % 2 === 0 ? 'bg-white' : 'bg-gray-50')}`;
+
+        tr.innerHTML = `
+          <td class="border p-2 text-center font-bold text-gray-600">${p.id}</td>
+          <td class="border p-2 text-xs font-medium">${p.enunciado}</td>
+          <td class="border p-2">${renderizarOpciones(p.opciones, p.respuesta_correcta)}</td>
+          
+          <td class="border p-2 text-center align-middle">
+            <input type="checkbox" class="w-5 h-5 cursor-pointer accent-green-600" 
+              ${estado.revisada ? 'checked' : ''} 
+              onchange="actualizarCampo(${p.id}, 'revisada', this.checked)">
+          </td>
+
+          <td class="border p-2 text-center align-middle">
+            <input type="checkbox" class="w-5 h-5 cursor-pointer accent-yellow-500" 
+              ${estado.dudosa ? 'checked' : ''} 
+              onchange="actualizarCampo(${p.id}, 'dudosa', this.checked)">
+          </td>
+
+          <td class="border p-2 align-middle">
+            <textarea rows="2" class="w-full text-xs p-1 border border-gray-300 rounded focus:outline-none focus:border-blue-500" 
+              placeholder="Ej: Manual CTO pág 45..." 
+              onchange="actualizarCampo(${p.id}, 'libro_referencia', this.value)">${estado.libro_referencia}</textarea>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      actualizarContadores();
+    }
+
+    function exportarJSON() {
+      // Combina las preguntas base con el estado para descargar un backup completo con todo unido
+      const exportData = preguntas200.map(p => ({
+        ...p,
+        ...getEstado(p.id)
+      }));
+      
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "revision_ope_especifico_200.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    // ¡Arrancamos!
+    renderizarTabla();
+  </script>
+</body>
+</html>
