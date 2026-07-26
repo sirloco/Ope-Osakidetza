@@ -4,6 +4,8 @@
 let usuarioActualId = null;
 let indiceActual = 0;
 let listaPreguntasBD = [];
+let temporizadorInterval = null;
+let tiempoRestante = 0;
 
 const elementoEnunciado = document.getElementById('enunciado');
 const contenedorOpciones = document.getElementById('opciones-container');
@@ -53,34 +55,87 @@ async function prepararPantallaUsuarios() {
 }
 
 // ==========================================
-// BLOQUE 2: LÓGICA DE USUARIO Y ARRANQUE
+// BLOQUE 2: LÓGICA DE CONFIGURACIÓN Y ARRANQUE
 // ==========================================
 document.getElementById('btn-empezar').addEventListener('click', async function () {
     const nombreIntroducido = document.getElementById('input-usuario').value.trim();
-
     if (nombreIntroducido === "") return alert("¡No puedes hacer el test sin poner tu nombre!");
 
+    // 1. Gestión del usuario
     let usuarioEnBD = await db.usuarios.where('nombre').equals(nombreIntroducido).first();
-
     if (!usuarioEnBD) {
         const nuevoId = await db.usuarios.add({ nombre: nombreIntroducido });
         usuarioEnBD = { id: nuevoId, nombre: nombreIntroducido };
     }
-
     usuarioActualId = usuarioEnBD.id;
     localStorage.setItem('ultimoUsuarioOpe', nombreIntroducido);
 
-    // Cargamos preguntas de la BD
-    listaPreguntasBD = await db.preguntas.toArray();
+    // 2. Extraer opciones elegidas
+    const tipoTemario = document.getElementById('select-temario').value;
+    const cantidadModo = document.getElementById('select-cantidad').value;
 
-    // NUEVO: Mezclar el array aleatoriamente para que no salgan siempre seguidas
-    listaPreguntasBD.sort(() => Math.random() - 0.5);
+    // 3. Filtrar preguntas de la BD (Recordatorio: últimas 200 son Específico)
+    let preguntasExtraidas = await db.preguntas.toArray();
 
+    if (tipoTemario === 'general') {
+        // Quitamos las últimas 200
+        preguntasExtraidas = preguntasExtraidas.slice(0, preguntasExtraidas.length - 200);
+    } else if (tipoTemario === 'especifico') {
+        // Cogemos solo las últimas 200
+        preguntasExtraidas = preguntasExtraidas.slice(-200);
+    }
+    // Si es "ambos", se quedan todas.
+
+    // 4. Mezclar aleatoriamente las preguntas filtradas
+    preguntasExtraidas.sort(() => Math.random() - 0.5);
+
+    // 5. Ajustar cantidad según el bloque elegido
+    if (cantidadModo === '30') {
+        listaPreguntasBD = preguntasExtraidas.slice(0, 30);
+    } else if (cantidadModo === '50') {
+        listaPreguntasBD = preguntasExtraidas.slice(0, 50);
+    } else if (cantidadModo === 'simulacro') {
+        listaPreguntasBD = preguntasExtraidas.slice(0, 110);
+        iniciarTemporizadorSimulacro(); // ¡Arrancamos el reloj!
+    } else {
+        listaPreguntasBD = preguntasExtraidas; // Todas
+    }
+
+    // 6. Cambiar de pantalla y empezar
     document.getElementById('pantalla-seleccion').classList.add('hidden');
     document.getElementById('test-container').classList.remove('hidden');
 
     cargarPregunta();
 });
+
+// Función para controlar el reloj en modo examen
+function iniciarTemporizadorSimulacro() {
+    const contenedorTemp = document.getElementById('temporizador-container');
+    const spanTiempo = document.getElementById('tiempo-restante');
+
+    contenedorTemp.classList.remove('hidden');
+    tiempoRestante = 120 * 60; // 120 minutos en segundos
+
+    temporizadorInterval = setInterval(() => {
+        tiempoRestante--;
+
+        if (tiempoRestante <= 0) {
+            clearInterval(temporizadorInterval);
+            alert("⏳ ¡TIEMPO AGOTADO! El simulacro ha terminado automáticamente.");
+            document.getElementById('btn-finalizar').click();
+        } else {
+            // Convertir a formato MM:SS
+            const minutos = Math.floor(tiempoRestante / 60);
+            const segundos = tiempoRestante % 60;
+            spanTiempo.textContent = `${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
+
+            // Si quedan menos de 10 minutos, parpadear en rojo intenso
+            if (tiempoRestante < 600) {
+                contenedorTemp.classList.add('bg-red-600', 'animate-pulse');
+            }
+        }
+    }, 1000); // 1000 ms = 1 segundo
+}
 
 // ==========================================
 // BLOQUE 3: LÓGICA DEL TEST
@@ -96,7 +151,6 @@ function cargarPregunta() {
 
     for (const [letra, texto] of Object.entries(preguntaActual.opciones)) {
         const boton = document.createElement('button');
-        // Estilo perfecto para Modo Oscuro: fondo gris intermedio, texto blanco puro bien visible
         boton.className = 'opcion-btn w-full text-left p-4 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600 text-white font-medium transition-colors cursor-pointer';
         boton.textContent = `${letra.toUpperCase()}) ${texto}`;
 
@@ -113,11 +167,9 @@ async function comprobarRespuesta(botonClicado, letraSeleccionada, letraCorrecta
     const esAcierto = (letraSeleccionada === letraCorrecta);
 
     if (esAcierto) {
-        // Estilo acierto modo oscuro (Fondo verde oscuro, borde verde brillante, texto claro)
         botonClicado.className = 'opcion-btn w-full text-left p-4 bg-green-950 border-2 border-green-500 rounded-lg text-green-200 font-bold';
         btnSiguiente.classList.remove('hidden');
     } else {
-        // Estilo fallo modo oscuro (Fondo rojo oscuro, borde rojo brillante, texto claro)
         botonClicado.className = 'opcion-btn w-full text-left p-4 bg-red-950 border-2 border-red-500 rounded-lg text-red-300 font-medium opacity-70';
         botonClicado.disabled = true;
     }
@@ -176,18 +228,20 @@ const btnFinalizar = document.getElementById('btn-finalizar');
 const btnVolverInicio = document.getElementById('btn-volver-inicio');
 
 btnFinalizar.addEventListener('click', async function () {
-    // 1. Ocultar el test y mostrar las estadísticas
+    // Si había un reloj de simulacro corriendo, lo detenemos
+    if (temporizadorInterval) {
+        clearInterval(temporizadorInterval);
+    }
+
     document.getElementById('test-container').classList.add('hidden');
     document.getElementById('estadisticas-container').classList.remove('hidden');
 
     try {
-        // 2. Extraer TODO el progreso del usuario actual de la BD
         const miProgreso = await db.progreso_repaso
             .where('usuario_id')
             .equals(usuarioActualId)
             .toArray();
 
-        // 3. Calcular aciertos y fallos totales
         let aciertosTotales = 0;
         let fallosTotales = 0;
 
@@ -199,19 +253,17 @@ btnFinalizar.addEventListener('click', async function () {
         document.getElementById('stat-aciertos').textContent = aciertosTotales;
         document.getElementById('stat-fallos').textContent = fallosTotales;
 
-        // 4. Buscar los puntos débiles (Preguntas con más fallos)
         const puntosDebiles = miProgreso
-            .filter(registro => registro.veces_fallada > 0) // Solo las que has fallado alguna vez
-            .sort((a, b) => b.veces_fallada - a.veces_fallada) // Ordenar de más a menos fallos
-            .slice(0, 5); // Quedarnos solo con las 5 peores
+            .filter(registro => registro.veces_fallada > 0)
+            .sort((a, b) => b.veces_fallada - a.veces_fallada)
+            .slice(0, 5);
 
         const listaDebiles = document.getElementById('lista-puntos-debiles');
-        listaDebiles.innerHTML = ''; // Limpiamos la lista
+        listaDebiles.innerHTML = '';
 
         if (puntosDebiles.length === 0) {
             listaDebiles.innerHTML = '<li class="text-green-400 italic p-4 bg-gray-700 rounded-lg text-center">¡Genial! Aún no tienes fallos registrados.</li>';
         } else {
-            // Recorremos las peores y buscamos su texto original en la tabla preguntas
             for (const punto of puntosDebiles) {
                 const preguntaOriginal = await db.preguntas.get(punto.pregunta_id);
 
@@ -233,9 +285,7 @@ btnFinalizar.addEventListener('click', async function () {
     }
 });
 
-// Botón para volver a empezar
 btnVolverInicio.addEventListener('click', function () {
-    // La forma más limpia de resetear la aplicación es recargar la página
     window.location.reload();
 });
 
