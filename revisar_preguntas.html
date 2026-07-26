@@ -53,7 +53,7 @@
                     <th class="border p-2 w-1/3 text-left shadow-sm">Opciones (Haz clic para alternar Verde/Rojo/Blanco)</th>
                     <th class="border p-2 w-20 text-center shadow-sm">Revisada<br>(Por ti)</th>
                     <th class="border p-2 w-32 text-left shadow-sm">Estado Libro</th>
-                    <th class="border p-2 w-56 text-left shadow-sm">Libro / Referencia</th>
+                    <th class="border p-2 w-64 text-left shadow-sm">Libro / Referencia</th>
                 </tr>
             </thead>
             <tbody id="cuerpo-tabla" class="text-gray-700">
@@ -82,6 +82,25 @@
             "15. Esquema Nacional de Seg. (ENS)"
         ];
 
+        // MAPA DE PDFs (Relaciona el libro con el nombre del archivo en la carpeta 'bibliografia')
+        const mapaPDFs = {
+            "1. PC y disp. móviles (Hardware)": "1_hardware.pdf",
+            "2. Sistemas operativos monopuesto": "2_sistemas_operativos.pdf",
+            "3. Redes locales": "3_redes_locales.pdf",
+            "4. Internet de las cosas": "4_internet_cosas.pdf",
+            "5. Ingeniería del software": "5_ingenieria_software.pdf",
+            "6. Mantenimiento y evol. de sistemas": "6_mantenimiento_sistemas.pdf",
+            "7. Windows 11 (Instalación)": "7_windows_11.pdf",
+            "8. Windows Server 2022": "8_windows_server_2022.pdf",
+            "9. Microsoft 365": "9_microsoft_365.pdf",
+            "10. Seguridad informática": "10_seguridad_informatica.pdf",
+            "11. RGPD (Reglamento Europeo)": "11_rgpd.pdf",
+            "12. LOPDGDD (Ley Orgánica 3/2018)": "12_lopdgdd.pdf",
+            "13. Firma digital": "13_firma_digital.pdf",
+            "14. ITIL 4 Foundation": "14_itil_4.pdf",
+            "15. Esquema Nacional de Seg. (ENS)": "15_ens.pdf"
+        };
+
         // 1. COGEMOS LAS ÚLTIMAS 200 PREGUNTAS
         const preguntas200 = preguntas.slice(-200);
 
@@ -108,7 +127,6 @@
                 estadoRevision[id].colores_opciones = {};
             }
 
-            // Inicialización por defecto: la respuesta_correcta original nace VERDE, el resto BLANCAS
             Object.keys(p.opciones).forEach(letra => {
                 if (!estadoRevision[id].colores_opciones[letra]) {
                     estadoRevision[id].colores_opciones[letra] = (letra === p.respuesta_correcta) ? 'verde' : 'blanca';
@@ -123,13 +141,13 @@
             if (p) {
                 getEstado(p)[campo] = valor;
                 guardarLocal();
-                if (campo === 'revisada') {
+                // Si cambiamos revisada o el libro de referencia, redibujamos para actualizar la fila/botón PDF
+                if (campo === 'revisada' || campo === 'libro_referencia') {
                     renderizarTabla();
                 }
             }
         }
 
-        // ROTACIÓN DE COLORES: Verde ➔ Rojo ➔ Blanca ➔ Verde...
         function rotarColorOpcion(id, letra) {
             const p = preguntas200.find(item => item.id === id);
             if (!p) return;
@@ -182,7 +200,7 @@
                 html += `
                         <li class="${claseCss}"
                             onclick="rotarColorOpcion(${p.id}, '${letra}')"
-                            title="Haz clic para cambiar: Verde (Correcta) ➔ Rojo (Incorrecta) ➔ Blanco (Normal)">
+                            title="Haz clic para cambiar color">
                             <span class="uppercase font-bold">${letra})</span> ${texto}
                         </li>`;
             }
@@ -206,19 +224,23 @@
                     opcionesLibro += `<option value="${libro}" ${seleccionado}>${libro}</option>`;
                 });
 
+                // Determinamos qué botón PDF mostrar
+                const archivoPDF = mapaPDFs[estado.libro_referencia];
+                const botonPDF = archivoPDF
+                    ? `<a href="bibliografia/${archivoPDF}" target="_blank" class="px-2 py-1.5 bg-red-100 hover:bg-red-200 border border-red-200 text-red-700 rounded shadow-sm text-xs font-bold transition-colors cursor-pointer" title="Abrir PDF en pestaña nueva">📄 PDF</a>`
+                    : `<span class="px-2 py-1.5 bg-gray-100 text-gray-400 border border-gray-200 rounded text-xs font-bold cursor-not-allowed" title="Selecciona un libro primero">📄 PDF</span>`;
+
                 tr.innerHTML = `
                       <td class="border p-2 text-center font-bold text-gray-600">${p.id}</td>
                       <td class="border p-2 text-xs font-medium">${p.enunciado}</td>
                       <td class="border p-2">${renderizarOpciones(p, estado)}</td>
 
-                      <!-- CAMPO 1: REVISADA POR TI -->
                       <td class="border p-2 text-center align-middle">
                         <input type="checkbox" class="w-5 h-5 cursor-pointer accent-green-600"
                           ${estado.revisada ? 'checked' : ''}
                           onchange="actualizarCampo(${p.id}, 'revisada', this.checked)">
                       </td>
 
-                      <!-- CAMPO 2: REVISADA EN LIBRO -->
                       <td class="border p-2 align-middle">
                         <select class="w-full text-xs p-1.5 border border-gray-300 rounded focus:outline-none focus:border-blue-500 bg-white cursor-pointer"
                           onchange="actualizarCampo(${p.id}, 'revisada_libro', this.value)">
@@ -228,12 +250,14 @@
                         </select>
                       </td>
 
-                      <!-- CAMPO 3: SELECCIÓN DE LIBRO -->
                       <td class="border p-2 align-middle">
-                        <select class="w-full text-xs p-1.5 border border-gray-300 rounded focus:outline-none focus:border-blue-500 bg-white cursor-pointer"
-                          onchange="actualizarCampo(${p.id}, 'libro_referencia', this.value)">
-                          ${opcionesLibro}
-                        </select>
+                        <div class="flex items-center gap-2">
+                            <select class="w-full text-xs p-1.5 border border-gray-300 rounded focus:outline-none focus:border-blue-500 bg-white cursor-pointer"
+                              onchange="actualizarCampo(${p.id}, 'libro_referencia', this.value)">
+                              ${opcionesLibro}
+                            </select>
+                            ${botonPDF}
+                        </div>
                       </td>
                     `;
                 tbody.appendChild(tr);
@@ -257,7 +281,6 @@
             downloadAnchor.remove();
         }
 
-        // NUEVA FUNCIÓN: IMPORTAR EL JSON CARGADO
         function importarJSON(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -266,7 +289,6 @@
             reader.onload = function (e) {
                 try {
                     const datosImportados = JSON.parse(e.target.result);
-
                     if (Array.isArray(datosImportados)) {
                         datosImportados.forEach(item => {
                             if (item.id) {
